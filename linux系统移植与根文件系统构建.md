@@ -25,6 +25,36 @@
 - 先将系统烧写到Sd卡中，烧写完成后SD卡会出现3个分区，其中u-boot分区看不到。然后将files复制到SD卡系统目录的rootfs/home/root中
 - 使用Linux图形界面拷贝不确定是不是传输完成，可以在命令行中执行**sync**命令等待传输完成 
 
+1. 将正点原子mftool中的files/文件移动到Linux下
+
+2. 使用files目录下的脚本文件./imx6mksdboot.sh烧写系统到SD卡(首先脚本文件权限需要修改`chmod 777 imx6mksdboot.sh`,所有sh文件的权限都修改一下)
+
+3. ```makefile
+   sudo ./imx6mksdboot.sh -device /dev/sdb -flash emmc -ddrsize 512
+   ```
+
+4. 烧写到SD卡中会出现3个分区`boot`,`rootfs`,`uboot`
+
+5. 将`files`复制到SD卡系统目录的`rootfs/home/root`中
+
+6. 开发板连接串口，拨码开关调整到从SD卡启动。
+
+7. 现在开发板启动的系统是SD里面的，随后使用串口连接的CRT的命令行换到上面保存在SD卡系统下的files文件路径
+
+8. 利用`./imx6mkemmcboot.sh`将系统烧写到emmc中
+
+9. 查找emmc的挂载点`/dev/mmcblk1`
+
+   ```makefile
+   fdisk -l
+   ```
+
+10. ```
+    ./imx6mkemmcboot.sh -device /dev/mmcblk1 -ddrsize 512
+    ```
+
+11. 烧写完成后将拨码开关调节到emmc启动。
+
 # 正点原子官方u-boot编译
 
 ## 什么是u-boot
@@ -53,12 +83,14 @@
 
   将正点原子提供的uboot压缩包放在这里面
 
+- 解压文件
+
 - 编译uboot的时候需要先配置
 
   - 清理
 
     ```makefile
-     make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- distclean
+    make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- distclean
     ```
 
   - 配置uboot---正点原子默认配置文件
@@ -75,8 +107,25 @@
     make V=1 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
     ```
 
-  - 编译完成之后会生成一个u-boot.bin文件。必须向u-boot.bin添加头部信息。u-boot编译最后会通过./tools/mkimage软件添加头部信息，生成u-boot.imx文件
-  - 如果配置过uboot，那么一定要注意shell脚本会清除整个工程。那么配置的文件也会被删除。配置项也会被删除掉
+  - 编译完成之后会生成一个u-boot.bin文件。必须向u-boot.bin添加头部信息。对于mx6u板子u-boot编译最后会通过./tools/mkimage软件会添加头部信息，生成u-boot.imx文件
+  
+  - 将u-boot.imx文件拷贝到win
+
+  - 将该文件拷贝到mftool中的firmware文件夹中，重命名并替换掉原本的uboot文件u-boot-imx6ull-14x14-emmc.imx。firmware是先下载到DDR中的系统，最终烧录到emmc中的系统是在files文件夹中，所以需要将刚才的u-boot.imx也重命名u-boot-imx6ull-14x14-ddr512-emmc.imx拷贝到files文件夹中。
+  
+  - 使用mftool工具烧写
+  
+  - CRT软件中在板子系统启动时在第一行会显示u-boot的编译时间，以此判断当前的u-boot是不是我们最新编译的。
+  
+  - 为了方便编译，可以将以上三行代码写成shell脚本。如果配置过uboot，那么一定要注意shell脚本会清除整个工程。那么配置的文件也会被删除。配置项也会被删除掉
+  
+    这里说的是通过图形界面配置了uboot的话要注意shell脚本会清除配置项。如果是通过修改uboot源码来配置的话就不用担心。
+  
   - 为了方便开发，建议在uboot顶层makefile里面设置好ARCH和CROSS_COMPILE两个变量的值。
 
-  
+# uboot命令使用
+
+
+
+
+
