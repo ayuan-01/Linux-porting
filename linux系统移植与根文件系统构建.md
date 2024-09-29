@@ -1259,6 +1259,18 @@ init进程 1
 
 - **CPU主频和网络驱动修改**
 
+  设置板子默认从网络启动：
+  
+  ```
+  setenv bootcmd 'tftp 80800000 zImage;tftp 83000000 imx6ull-alientek-emmc.dtb;bootz 80800000 - 83000000;'
+  ```
+  
+  设置根文件系统位置，emmc设备的第二个分区
+  
+  ```
+  setenv bootargs console=ttymxc0,115200 root=/dev/mmcb1k1p2
+  ```
+  
   - 启动开发板进入命令行系统
   
   - 输入如下命令查看 cpu 信息：
@@ -1270,4 +1282,112 @@ init进程 1
     BogoMIPS 是 Linux 系统中衡量处理器运行速度的一个“尺子”，处理器性能越强，主频越高，BogoMIPS 值就越大。BogoMIPS 只是粗略的计算 CPU 性能，并不十分准确。但是我们可以通过 BogoMIPS 值来大致的判断当前处理器的性能。
   
   - 一种方法查看当前 CPU 的工作频率。进入到目录/sys/bus/cpu/devices/cpu0/cpufreq 中，此目录下会有很多文件。
+  
+    - 此目录中记录了 CPU 频率等信息，这些文件的含义如下： 
+  
+      **cpuinfo_cur_freq**：当前 cpu 工作频率，从 CPU 寄存器读取到的工作频率。 
+  
+      **cpuinfo_max_freq**：处理器所能运行的最高工作频率(单位: KHz）。 
+  
+      **cpuinfo_min_freq** ：处理器所能运行的最低工作频率(单位: KHz）。 
+  
+      **cpuinfo_transition_latency**：处理器切换频率所需要的时间(单位:ns)。 
+  
+      **scaling_available_frequencies**：处理器支持的主频率列表(单位: KHz）。 
+  
+      **scaling_available_governors**：当前内核中支持的所有 governor(调频)类型。 
+  
+      **scaling_cur_freq**：保存着 cpufreq 模块缓存的当前 CPU 频率，不会对 CPU 硬件寄存器进行检查。 
+  
+      **scaling_driver**：该文件保存当前 CPU 所使用的调频驱动。 
+  
+      **scaling_governor**：governor(调频)策略，Linux 内核一共有 5 中调频策略， 
+  
+      ①、Performance，最高性能，直接用最高频率，不考虑耗电。 
+  
+      ②、Interactive，一开始直接用最高频率，然后根据 CPU 负载慢慢降低。 
+  
+      ③、Powersave，省电模式，通常以最低频率运行，系统性能会受影响，一般不会用这个！ 
+  
+      ④、Userspace，可以在用户空间手动调节频率。 
+  
+      ⑤、Ondemand，定时检查负载，然后根据负载来调节频率。负载低的时候降低 CPU 频率， 
+  
+      这样省电，负载高的时候提高 CPU 频率，增加性能。 
+  
+      **scaling_max_freq**：governor(调频)可以调节的最高频率。 
+  
+      **cpuinfo_min_freq**：governor(调频)可以调节的最低频率。 
+  
+      stats 目录下给出了 CPU 各种运行频率的统计情况，比如 CPU 在各频率下的运行时间以及 
+  
+      变频次数。
+  
+      使用如下命令查看当前 CPU 频率：
+  
+      ```
+      cat cpuinfo_cur_freq
+      ```
+  
+      *查看 stats 目录下的 time_in_state 文件可以看到 CPU 在各频率下的工作时间*
+  
+  - 修改频率
+  
+    imx_alientek_emmc_defconfig 文件
+  
+    46 CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+  
+  - 图形化界面配置频率
+  
+    ```
+    CPU Power Management 
+     -> CPU Frequency scaling 
+     -> Default CPUFreq governor
+    ```
+  
+    配置后编译
+  
+  - 超频操作，修改设备树，**见文档**.
+  
+- 修改EMMC驱动
+
+  - 使能8线emmc驱动
+
+    正点原子EMMC核心板上采用的是8位的数据线，Linux内核中默认是4线的，4线肯定没有8线模式速度快，所以本节要将EMMC的驱动修改为8线，修改方式很简单，直接修改设备树即可。
+
+    相关模块改为如下代码（arch/arm/boot/dts/imx6ull-14x14-evk-emmc.dts中的配置）
+
+    ```sh
+    734 &usdhc2 {
+    735 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+    736 	pinctrl-0 = <&pinctrl_usdhc2_8bit>;
+    737 	pinctrl-1 = <&pinctrl_usdhc2_8bit_100mhz>;
+    738 	pinctrl-2 = <&pinctrl_usdhc2_8bit_200mhz>;
+    739 	bus-width = <8>;
+    740 	non-removable;
+    741 	status = "okay";
+    742 };
+    ```
+
+  - 关闭emmc1.8V供电选项
+
+    &usdhc2 {
+
+    ​    pinctrl-names = "default", "state_100mhz", "state_200mhz";
+
+    ​    pinctrl-0 = <&pinctrl_usdhc2_8bit>;
+
+    ​    pinctrl-1 = <&pinctrl_usdhc2_8bit_100mhz>;
+
+    ​    pinctrl-2 = <&pinctrl_usdhc2_8bit_200mhz>;
+
+    ​    bus-width = <8>;
+
+    ​    non-removable;
+
+    ​    **no-1-8-v;**
+
+    ​    status = "okay";
+
+    };
 
