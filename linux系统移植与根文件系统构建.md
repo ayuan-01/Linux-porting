@@ -1468,4 +1468,4 @@ init进程 1
 
 ## 使用BusyBox构建根文件系统
 
-还有很多更加成熟化的根文件系统构建方式，builtroom，yocto。
+还有很多更加成熟化的根文件系统构建方式，builtroom，yocto。构建的根文件系统调试我们通过nfs网络挂载。也就是根文件系统存放在Ubuntu下，开发板启动以后通过nfs服务使用Ubuntu下的根文件系统。
