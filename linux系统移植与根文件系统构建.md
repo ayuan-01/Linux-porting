@@ -1391,3 +1391,71 @@ init进程 1
 
     };
 
+- 网络驱动修改
+
+1. 修改LAN8720复位以及时钟引脚驱动
+
+   主要是修改设备树文件里面的相关引脚（SNVS_TAMPER7 和 SNVS_TAMPER8）。见文档
+
+   修改 fec1 和fec2节点的pinctrl-0属性
+
+   修改LAN8720A的PHY地址
+
+   ```
+   ethphy0: ethernet-phy@0 {
+   			compatible = "ethernet-phy-ieee802.3-c22";
+   			reg = <0>;
+   		};
+   
+   		ethphy1: ethernet-phy@1 {
+   			compatible = "ethernet-phy-ieee802.3-c22";
+   			reg = <1>;
+   		};
+   ```
+
+   修改内核源码中的fec_main.c文件如果要在 I.MX6ULL 上使用 LAN8720A 就需要设置ENET1 和 ENET2 的 TX_CLK 引脚复位寄存器的 SION 位为 1。
+
+   ```c
+   	/* 3452行 设置 MX6UL_PAD_ENET1_TX_CLK 和 MX6UL_PAD_ENET2_TX_CLK
+   	* 这两个 IO 的复用寄存器的 SION 位为 1。
+   	*/
+   	void __iomem *IMX6U_ENET1_TX_CLK;
+   	void __iomem *IMX6U_ENET2_TX_CLK;
+   
+   	IMX6U_ENET1_TX_CLK = ioremap(0X020E00DC, 4);
+   	writel(0X14, IMX6U_ENET1_TX_CLK);
+   	
+   	IMX6U_ENET2_TX_CLK = ioremap(0X020E00FC, 4);
+   	writel(0X14, IMX6U_ENET2_TX_CLK);
+   ```
+
+   配置Linux内核，使能LAN8720驱动
+
+   ```
+   -> Device Drivers 
+   	-> Network device support 
+   		-> PHY Device support and infrastructure 
+   			-> Drivers for SMSC PHYs
+   ```
+
+   修改smsc.c文件
+
+   编译内核，网络启动
+
+   打开网卡
+
+   ```sh
+   ifconfig eth0 up
+   ifconfig eth1 up
+   ```
+
+   其中eth0 对应于 ENET2，eth1 对应于 ENET1
+
+   设置IP后pingLinux服务器
+
+   ```
+   ifconfig eth0 192.168.137.50
+   ping 192.168.137.100
+   ```
+
+   
