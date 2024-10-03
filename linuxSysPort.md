@@ -29,7 +29,7 @@
 
 2. 使用files目录下的脚本文件./imx6mksdboot.sh烧写系统到SD卡(首先脚本文件权限需要修改`chmod 777 imx6mksdboot.sh`,所有sh文件的权限都修改一下)
 
-3. ```makefile
+   ```makefile
    sudo ./imx6mksdboot.sh -device /dev/sdb -flash emmc -ddrsize 512
    ```
 
@@ -1469,3 +1469,242 @@ init进程 1
 ## 使用BusyBox构建根文件系统
 
 还有很多更加成熟化的根文件系统构建方式，builtroom，yocto。构建的根文件系统调试我们通过nfs网络挂载。也就是根文件系统存放在Ubuntu下，开发板启动以后通过nfs服务使用Ubuntu下的根文件系统。
+
+- 修改Makefile添加交叉编译器
+
+  修改ARCH
+
+  修改CROSS_COMPILE
+
+  /usr/local/arm/gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-
+
+- busybox中文字符支持
+
+  修改两个c文件
+
+- 配置busybox
+
+  make defconfig
+
+  图形化界面配置
+
+  ​	设置动态编译。静态编译的时候DNS不可用
+
+  相关设置参见教程文档
+
+  将编译升成的文件指定到nfs文件夹中编译完成后没有库文件
+
+  ```
+  make install CONFIG_PREFIX=/home/syw/linux/nfs/rootfs
+  ```
+
+- 向根文件系统添加库文件
+
+  库文件地址: /local/arm/gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabihf/arm-linux-gnueabihf/libc/lib
+
+  cp *so* *.a /home/syw/linux/nfs/rootfs/lib -d
+
+  -d的作用
+
+  1. **保留链接**：如果源文件是一个符号链接，`-d` 选项会复制链接本身而不是链接指向的文件。
+  2. **保留属性**：复制文件时保留其属性，如时间戳、权限等。
+  3. **复制目录**：如果源文件是一个目录，`-d` 选项会复制目录本身而不是目录内的内容。
+
+  ld-linux-armhf.so.3 复制过来是一个链接文件，需要rm之后重新复制，取消-d选项
+
+  继续进入如下目录中： 
+
+  /usr/local/arm/gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabihf/arm-linux-gnueabihf/lib 
+
+  cp *so* *.a /home/syw/linux/nfs/rootfs/lib/ -d
+
+- 向rootfs的usr/lib添加库文件
+
+  ```
+  要复制的库文件: /usr/local/arm/gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabihf/arm-linux-gnueabihf/libc/usr/lib
+  复制到: cp *so* *.a /home/syw/linux/nfs/rootfs/usr/lib/ -d
+  ```
+
+- 创建其他文件夹
+
+  mkdir dev proc mnt sys tmp root
+
+- 根文件系统初步测试
+
+  为了方便测试我们采用挂载网络根文件系统nfs。要求：
+
+  linux内核网络驱动工作正常
+
+  设置uboot的bootargs环境变量，也就是命令行参数
+
+  ```sh
+  bootargs=console=ttymxc0,115200 root=/dev/nfs nfsroot=192.168.137.100:/home/syw/linux/nfs/rootfs,proto=tcp rw ip=192.168.137.50:192.168.137.100:192.168.137.1:255.255.255.0::eth0:off
+  ```
+
+  boot启动根文件系统
+
+- 完善根文件系统
+
+  创建/etc/init.d/reS文件
+
+  ```sh
+    1 #!/bin/sh
+    2 PATH=/sbin:/bin:/usr/sbin:usr/bin:$PATH
+    3 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lib:/usr/lib
+    4 export PATH LD_LIBRARY_PATH
+    5 
+    6 mount -a
+    7 mkdir /dev/pts
+    8 mount -t devpts devpts /dev/pts
+    9 
+   10 echo /sbin/mdev > /proc/sys/kernel/hotplug
+   11 mdev -s
+  ```
+
+  使用 mount 命令来挂载所有的文件系统，这些文件系统由文件/etc/fstab 来指定，所以我们一会还要创建/etc/fstab 文件。
+
+- 创建/etc/fstab 文件
+
+  ```sh
+  #<file system> <mount point> <type> <options> <dump> <pass>
+  proc			/proc 		proc 	defaults 	0 		0
+  tmpfs 			/tmp 		tmpfs 	defaults 	0 		0
+  sysfs 			/sys 		sysfs 	defaults 	0 		0
+  ```
+
+- 创建/etc/inittab文件
+
+  ```sh
+  #etc/inittab
+  ::sysinit:/etc/init.d/rcS
+  console::askfirst:-/bin/sh
+  ::restart:/sbin/init
+  ::ctrlaltdel:/sbin/reboot
+  ::shutdown:/bin/umount -a -r
+  ::shutdown:/sbin/swapoff -a
+  ```
+
+### 根文件系统其他功能测试
+
+- 软件运行测试
+
+  在rootfs中创建drivers文件夹，写一个hello程序，在Linux服务器上使用交叉编译器进行编译，然后在ARM开发板上运行。
+
+  软件运行的时候设置在后台运行：加&符号：**./hello &**
+
+  在后台运行的软件可以使用“kill -9 pid(进程 ID)”命令来关闭掉，首先使用“ps”命令查看要关闭的软件 PID 是多少，ps 命令用于查看所有当前正在运行的进程，并且会给出进程的 PID。输入“ps”命令
+
+- 中文字符测试
+
+  - secureCRT的编码方式设置为UTF-8
+
+- 开机自启动测试
+
+  测试 hello 软件的时候都是等 Linux 启动进入根文件系统以后手动输入命令“./hello”来完成的。我们一般做好产品以后都是需要开机自动启动相应的软件
+
+  进入根文件系统的时候会运行/etc/init.d/rcS 这个 shell 脚本，因此我们可以在这个脚本里面添加自启动相关内容。
+
+  ```sh
+    1 #!/bin/sh
+    2 PATH=/sbin:/bin:/usr/sbin:usr/bin:$PATH
+    3 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lib:/usr/lib
+    4 export PATH LD_LIBRARY_PATH
+    5 
+    6 mount -a
+    7 mkdir /dev/pts
+    8 mount -t devpts devpts /dev/pts
+    9 
+   10 echo /sbin/mdev > /proc/sys/kernel/hotplug
+   11 mdev -s
+   12 
+   13 # 开机自启动
+   14 cd /drivers
+   15 ./hollo
+   16 cd /
+  ```
+
+  
+
+# 使用mfgtool烧写系统
+
+MfgTool2.exe 就是烧写软件，但是我们不会直接打开这个软件烧写，mfg_tools 不仅能烧写I.MX6U，而且也能给 I.MX7、I.MX6Q 等芯片烧写，所以在烧写之前必须要进行配置下面的这些众多的.vbs 文件就是配置脚本，烧写的时候通过双击这些.vbs 文件来打开烧写工具。这些.vbs 烧写脚本既可以根据处理器的不同，由用户选择向 I.MX6D、I.MX6Q、I.MX6S、I.MX7、I.MX6UL 和 I.MX6ULL 等的哪一款芯片烧写系统。也可以根据存储芯片的不同，选择向 EMMC、NAND 或 QSPI Flash 等的哪一种存储设备烧写。我们现在需要向 I.MX6U 烧写系统，因此需参考以下的 5 个烧写脚本： 
+
+![1727925245572](.\fig\1727925245572.png)
+
+MfgTool 是通过 USB OTG 接口将系统烧写进 EMMC 中的。
+
+![1727925619461](.\fig\1727925619461.png)
+
+点击“Start”按钮即可开始烧写，烧写什么东西呢？肯定是烧写 uboot、Linux kernel、.dtb 和 rootfs，那么这四个应该放到哪里 MfgTool 才能访问到呢？进入如下目录中：
+
+L4.1.15_2.0.0-ga_mfg-tools/mfgtools-with-rootfs/mfgtools/Profiles/Linux/OS Firmware 
+
+文件夹“OS Firmware”看名字就知道是存放系统固件的，我们重点关注 files、firmware 这两个文件夹，以及 ucl2.xml 这个文件。
+
+在具体看这三个文件和文件夹之前，我们先来简单了解一下 MfgTool 烧写的原理，MfgTool 其实是先通过 USB OTG 先将 uboot、kernel 和.dtb(设备树)这是三个文件下载到开发板的 DDR 中，注意不需要下载 rootfs。就相当于直接在开发板的DDR上启动 Linux 系统，等 Linux 系统启动以后再向 EMMC 中烧写完整的系统，包括 uboot、linux、kernel、.dtb(设备树)和 rootfs。
+
+1. firmware文件
+
+![1727926430747](.\fig\1727926430747.png)
+
+如果要烧写我们的系统，就需要用我们编译出来的 zImage、u-boot.imx 和 imx6ull-alientek-emmc.dtb 这三个文件替换掉表中这三个文件。但是名字要和表中的一致.
+
+2. files文件夹：
+
+将表 39.2.2.1 中的这三个文件下载到开发板的 DDR 上以后烧写的第一阶段就完成了，第二阶段就是从 files 目录中读取整个系统文件，并将其烧写到 EMMC 中。
+
+![1727926599995](.\fig\1727926599995.png)
+
+如果要烧写我们自己编译出来的系统，就需要用我们编译出来的 zImage、u-boot.imx 和imx6ull-alientek-emmc.dtb 和 rootfs 这四个文件替换掉表中这四个文件。
+
+3. ucl2.xml文件
+
+files 和 firmware 目录下有众多的 uboot 和设备树，那么烧写的时候究竟选择哪一个呢？这。ucl2.xml 以“<UCL>”开始，以“</UCL>”结束。“<CFG>” 和“</CFG>”之间是配置相关内容，主要是判断当前是给 I.MX 系列的哪个芯片烧写系统。 “<LIST>”和“</LIST>”之间的是针对不同存储芯片的烧写命令。个工作就是由 ucl2.xml 文件来完成的。
+
+参见文档39.2节。Page.1040
+
+通过读取芯片的VID和 PID 即可判断出当前要烧写什么处理器的系统。确定了处理器以后就要确定向什么存储设备烧写系统，这个时候就要有请 mfgtool2-yocto-mx-evk-emmc.vbs 再次登场
+
+### 系统烧写
+
+1. 改名
+
+   ![1727947309627](.\fig\1727947309627.png)
+
+   将改过名字的文件放置到fileware和file文件中，fireware中不用放根文件系统rootfs
+
+2. 网络开机自启动设置
+
+   rcS文件中追加下面代码
+
+   ```sh
+   7 #网络开机自启动设置
+   8 ifconfig eth0 up
+   9 #udhcpc -i eth0 
+   10 ifconfig eth0 192.168.1.251 netmask 255.255.255.0
+   11 route add default gw 192.168.1.1
+   ```
+
+3. 改造自己的烧写工具
+
+   - 确定文件系统名字
+
+     ![1727947869375](.\fig\1727947869375.png)
+
+   - 修改ucl2.xml文件
+
+     主要是删掉用不到的代码，并且将需要烧写的文件的名字更改为我们实际的命名。
+
+     修改后的文件在mymfgtool中
+
+   - 下载完成后需要改写uboot中的bootcmd和bootargs的变量值
+
+     ```sh
+     =>setenv bootcmd 'mmc dev 1;fatload mmc 1:1 80800000 zImage-alientek-emmc;fatload mmc 1:1 83000000 imx6ull-alientek-emmc.dtb;bootz 80800000 - 83000000'
+     =>setenv bootargs 'console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw'
+     =>saveenv
+     ```
+
+   - 为了方便我们可以在uboot源码中固定上述两个变量的值。在此我暂不固定
+
+   
