@@ -60,7 +60,7 @@
 ## 什么是u-boot
 
 - u-boot是一个裸机程序，比较复杂
-- uboot就是一个bootloader，作用就是启动Linux或其它系统。uboot最主要的工作就是初始化DDR。因为Linux的运行是运行在DDR里面的。Linux的镜像如果不裁剪的话大概有四五M字节，内部的RAM是放不下的，所以要放到DDR里面去运行。
+- uboot就是一个bootloader，作用就是启动Linux或其它系统。**uboot最主要的工作就是初始化DDR**。因为Linux的运行是运行在DDR里面的。Linux的镜像如果不裁剪的话大概有四五M字节，内部的RAM是放不下的，所以要放到DDR里面去运行。
 - 对于6U来讲，DDR的初始化是内部的bootroom完成的
 - 但是对于其他的大部分的cotex-A系列的芯片的bootroom是不会初始化DDR的。这时就必须启动uboot在uboot中完成DDR的初始化。
 - 初始化完成之后，Linux的*系统镜像（zImage或uImage）加设备树（.dtb)*是要存储在某个地方，一般存放在SD卡，emmc，nand，spi flash等外置的存储区域。
@@ -737,9 +737,6 @@ U-Boot 初始化与启动设备相关的存储接口，如 SD 卡、NAND Flash �
 
 ```
 bash
-
-
-复制代码
 bootcmd=mmc dev 0; ext2load mmc 0:1 ${loadaddr} /boot/zImage; ext2load mmc 0:1 ${fdtaddr} /boot/imx6ull-14x14-evk.dtb; bootz ${loadaddr} - ${fdtaddr}
 ```
 
@@ -1118,7 +1115,7 @@ config ARC
 
 “depends on”说明“SYS_GENERIC_BOARD”项依赖于“HAVE_GENERIC_BOARD”, 也就是“HAVE_GENERIC_BOARD”被选中以后“SYS_GENERIC_BOARD”才能被选中。 
 
-“select”表示方向依赖，当选中“ARC”以后，“HAVE_PRIVATE_LIBGCC”，“HAVE_GENERIC_BOARD”，“SYS_GENERIC_BOARD”和“SUPPORT_OF_CONTROL”这四个也会被选中。 
+“select”表示方向依赖，当选中“ARC”以后，“HAVE_PRIVATE_LIBGCC”，“HAVE_GENERIC_BOARD”，“SYS_GENERIC_BOARD”和“SUPPORT_OF_CONTROL”这四个也会被选中。
 
 ### menuconfig
 
@@ -1209,7 +1206,7 @@ init进程 1
   - imx_v7_defconfig 和imx_v7_mfg_defconfig 都可作为 I.MX6ULL EVK 开发板所使用的默认配置文件。但是这里建议使用 imx_v7_mfg_defconfig 这个默认配置文件，首先此配置文件默认支持 I.MX6UL 这款芯片， 而且重要的一点就是此文件编译出来的 zImage 可以通过 NXP 官方提供的 MfgTool 工具烧写！！imx_v7_mfg_defconfig 中的“mfg”的意思就是 MfgTool。
   - 配置内核**make imx_v7_mfg_defconfig**
   - 编译 make
-  - Linux 内核编译完成以后会在 arch/arm/boot 目录下生成 zImage 镜像文件，如果使用设备树的话还会在 arch/arm/boot/dts 目录下开发板对应的.dtb(设备树)文件，比如 imx6ull-14x14-evk.dtb就是 NXP 官方的 I.MX6ULL EVK 开发板对应的设备树文件。
+  - Linux 内核编译完成以后会在 **arch/arm/boot** 目录下生成 zImage 镜像文件，如果使用设备树的话还会在 arch/arm/boot/dts 目录下开发板对应的.dtb(设备树)文件，比如 imx6ull-14x14-evk.dtb就是 NXP 官方的 I.MX6ULL EVK 开发板对应的设备树文件。
 
 - 内核启动测试
 
